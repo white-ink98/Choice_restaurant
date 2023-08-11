@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
     'restaurant',
 
 ]
@@ -129,5 +130,15 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
-    ]
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+    ],
+
+}
+
+JWT_AUTH = {
+    'JWT_SECRET_KEY': 'django-insecure-27a^^1l9fjrh3_@srfh*z7zxi5l^j=un3cdf$&aj@hlnzl7l+$',
+    'JWT_ALGORITHM': 'HS256',
 }

@@ -1,21 +1,34 @@
 from datetime import date
 
-# from django.views.generic import ListView
+from django.contrib.auth.models import User
 from rest_framework import status
+from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import IsAuthenticated
-# from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from restaurant.api.serializers import (EmployeeSerializer, MenuSerializer,
-                                        RestaurantSerializer, VoteSerializer)
-
 from .models import Employee, Menu, Restaurant, Vote
+from .serializers import (EmployeeSerializer, MenuSerializer,
+                          RestaurantSerializer, VoteSerializer)
 
 
-# class RestaurantView(ListView):
-#     model = Restaurant
-#     queryset = Restaurant.objects.filter(draft=False)
+class UserRegistration(APIView):
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        if not username or not password:
+            return Response({'error': 'Username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(username=username, password=password)
+        return Response({'message': 'User registered successfully.'}, status=status.HTTP_201_CREATED)
+
+
+class UserLogin(ObtainAuthToken):
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        token = Token.objects.get(key=response.data['token'])
+        return Response({'token': token.key})
 
 
 class RestaurantList(APIView):
@@ -64,14 +77,15 @@ class VoteList(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        employee = request.user.employee
+        user = request.user
+        employee, created = Employee.objects.get_or_create(user=user)
         menu_id = request.data.get('menu')
-        try:
-            menu = Menu.objects.get(id=menu_id)
-        except Menu.DoesNotExist:
-            return Response({'error': 'Menu not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if the employee has already voted for this menu
+        try:
+            menu = Menu.objects.get(id=menu_id, date=date.today())
+        except Menu.DoesNotExist:
+            return Response({'error': 'Menu not found for today'}, status=status.HTTP_404_NOT_FOUND)
+
         if Vote.objects.filter(employee=employee, menu=menu).exists():
             return Response({'error': 'You have already voted for this menu'}, status=status.HTTP_400_BAD_REQUEST)
 
