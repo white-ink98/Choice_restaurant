@@ -1,0 +1,20 @@
+version: '3'
+services:
+  db:
+    image: postgres:15.3
+    environment:
+      POSTGRES_DB: choice_restaurant
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ert
+    ports:
+      - "5432:5432"
+  web:
+    image: python:3.11
+    volumes:
+      - .:/code
+    working_dir: /code
+    command: bash -c "pip install -r requirements.txt && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
