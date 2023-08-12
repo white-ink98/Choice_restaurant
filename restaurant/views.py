@@ -1,10 +1,11 @@
 from datetime import date
 
 from django.contrib.auth.models import User
-from rest_framework import status
+from rest_framework import status, serializers
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import CreateAPIView, ListCreateAPIView
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -17,8 +18,14 @@ class UserRegistration(APIView):
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
+
         if not username or not password:
             return Response({'error': 'Username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(username=username).exists():
+            return Response({
+                'error': 'Username already exists. Please choose a different username.'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.create_user(username=username, password=password)
         return Response({'message': 'User registered successfully.'}, status=status.HTTP_201_CREATED)
@@ -31,66 +38,38 @@ class UserLogin(ObtainAuthToken):
         return Response({'token': token.key})
 
 
-class RestaurantList(APIView):
-    def get(self, request):
-        restaurants = Restaurant.objects.all()
-        serializer = RestaurantSerializer(restaurants, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        serializer = RestaurantSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class RestaurantList(ListCreateAPIView):
+    queryset = Restaurant.objects.all()
+    serializer_class = RestaurantSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
 
-class MenuList(APIView):
-    def get(self, request):
-        menus = Menu.objects.filter(date=date.today())
-        serializer = MenuSerializer(menus, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        serializer = MenuSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class MenuList(ListCreateAPIView):
+    queryset = Menu.objects.filter(date=date.today())
+    serializer_class = MenuSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
 
-class EmployeeList(APIView):
-    def get(self, request):
-        employees = Employee.objects.all()
-        serializer = EmployeeSerializer(employees, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        serializer = EmployeeSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class EmployeeList(ListCreateAPIView):
+    queryset = Employee.objects.all()
+    serializer_class = EmployeeSerializer
 
 
-class VoteList(APIView):
+class VoteList(CreateAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = VoteSerializer
 
-    def post(self, request):
-        user = request.user
+    def perform_create(self, serializer):
+        user = self.request.user
         employee, created = Employee.objects.get_or_create(user=user)
-        menu_id = request.data.get('menu')
+        menu_id = self.request.data.get('menu')
 
         try:
             menu = Menu.objects.get(id=menu_id, date=date.today())
         except Menu.DoesNotExist:
-            return Response({'error': 'Menu not found for today'}, status=status.HTTP_404_NOT_FOUND)
+            raise serializers.ValidationError({'error': 'Menu not found for today'})
 
         if Vote.objects.filter(employee=employee, menu=menu).exists():
-            return Response({'error': 'You have already voted for this menu'}, status=status.HTTP_400_BAD_REQUEST)
+            raise serializers.ValidationError({'error': 'You have already voted for this menu'})
 
-        serializer = VoteSerializer(data={'employee': employee.id, 'menu': menu.id})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save(employee=employee, menu=menu)

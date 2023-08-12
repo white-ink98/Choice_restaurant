@@ -18,7 +18,11 @@ class Menu(models.Model):
 
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    version = models.CharField(max_length=10)  # Stores the mobile app version
+    version_choices = (
+        ('v1', 'Version 1'),
+        ('v2', 'Version 2'),
+    )
+    version = models.CharField(max_length=10, choices=version_choices)  # mobile app version
 
     def __str__(self):
         return self.user.username
